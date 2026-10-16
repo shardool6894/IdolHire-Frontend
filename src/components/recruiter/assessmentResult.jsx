@@ -78,7 +78,7 @@ export default function AssessmentResult() {
         <div className="overflow-hidden border-[3px] border-ink bg-cream-light shadow-hard-lg">
           <div className="grid grid-cols-[1fr_auto_auto_5rem] gap-4 border-b-2 border-ink bg-cream-dark px-6 py-3 font-mono text-xs uppercase tracking-widest text-ink-light">
             <span>Candidate</span>
-            <span>Score</span>
+            <span>Answered</span>
             <span>Status</span>
             <span>Response</span>
           </div>
@@ -96,7 +96,7 @@ export default function AssessmentResult() {
   );
 }
 
-// One candidate row. "View" fetches that candidate's actual answers, question by question.
+// One candidate row. "View" fetches their written answers and Helper chat, stage by stage.
 function ResultRow({ assessmentId, row }) {
   const [open, setOpen] = useState(false);
   const [detail, setDetail] = useState(null);
@@ -118,7 +118,7 @@ function ResultRow({ assessmentId, row }) {
     <div className="border-b-2 border-ink/15 last:border-b-0">
       <div className="grid grid-cols-[1fr_auto_auto_5rem] items-center gap-4 px-6 py-4">
         <span className="truncate text-sm">{row.email}</span>
-        <span className="font-mono text-sm">{row.score == null ? "\u2014" : `${row.score}/${row.maxScore}`}</span>
+        <span className="font-mono text-sm">{row.answered}/{row.total}</span>
         <span className="text-sm font-bold uppercase tracking-wide text-blue">
           {STATUS_LABELS[row.status] ?? row.status}
         </span>
@@ -133,43 +133,51 @@ function ResultRow({ assessmentId, row }) {
       </div>
 
       {open && (
-        <div className="space-y-5 border-t-2 border-ink/15 bg-cream px-6 py-5">
+        <div className="space-y-6 border-t-2 border-ink/15 bg-cream px-6 py-5">
           {error && <p className="text-sm font-semibold text-red">{error}</p>}
           {!error && !detail && <p className="text-sm text-ink-light">Loading...</p>}
           {detail?.responses.map((r, i) => (
-            <div key={i} className="space-y-2">
-              <p className="text-sm font-semibold">
-                <span className="mr-2 font-mono text-xs text-ink-light">Q{i + 1}</span>
+            <div key={i} className="space-y-3">
+              <p className="whitespace-pre-wrap text-sm font-semibold">
+                <span className="mr-2 font-mono text-xs text-ink-light">Stage {i + 1}</span>
                 {r.prompt}
               </p>
-              <ul className="space-y-1">
-                {r.options.map((option, idx) => {
-                  const picked = r.selectedIndex === idx;
-                  const isCorrect = r.correctIndex === idx;
-                  return (
-                    <li
-                      key={idx}
-                      className={`flex items-center justify-between gap-3 border-2 px-3 py-1.5 text-sm ${
-                        picked && isCorrect
-                          ? "border-blue bg-blue/10 font-semibold"
-                          : picked
-                            ? "border-red bg-red/10 font-semibold"
-                            : isCorrect
-                              ? "border-blue/50 border-dashed"
-                              : "border-ink/15"
-                      }`}
-                    >
-                      <span>{option}</span>
-                      <span className="shrink-0 font-mono text-xs uppercase tracking-wide text-ink-light">
-                        {picked && "Candidate's answer"}
-                        {picked && isCorrect && " \u00b7 "}
-                        {isCorrect && "Correct"}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-              {r.selectedIndex === null && <p className="font-mono text-xs text-ink-light">Not answered</p>}
+
+              {r.guidance && (
+                <p className="whitespace-pre-wrap border-2 border-dashed border-ink/30 px-3 py-2 text-xs text-ink-light">
+                  <span className="mr-1 font-mono uppercase tracking-widest">Guidance:</span>
+                  {r.guidance}
+                </p>
+              )}
+
+              {r.answer === null ? (
+                <p className="font-mono text-xs text-ink-light">Not answered</p>
+              ) : (
+                <p className="whitespace-pre-wrap border-2 border-blue/50 bg-blue/5 px-3 py-2 text-sm">{r.answer}</p>
+              )}
+
+              {r.helper.length > 0 && (
+                <details className="text-sm">
+                  <summary className="cursor-pointer font-mono text-xs uppercase tracking-widest text-ink-light hover:text-red">
+                    Helper chat ({r.helper.filter((m) => m.role === "candidate").length} questions)
+                  </summary>
+                  <ul className="mt-2 space-y-2">
+                    {r.helper.map((m, j) => (
+                      <li
+                        key={j}
+                        className={`whitespace-pre-wrap border-2 px-3 py-2 ${
+                          m.role === "candidate" ? "border-ink/20" : "border-blue/30 bg-blue/5"
+                        }`}
+                      >
+                        <span className="mb-1 block font-mono text-[10px] uppercase tracking-widest text-ink-light">
+                          {m.role === "candidate" ? "Candidate" : "Helper"}
+                        </span>
+                        {m.content}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
             </div>
           ))}
         </div>
