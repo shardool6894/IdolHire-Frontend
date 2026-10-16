@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
 
 const ROLE = "candidate";
@@ -44,7 +44,7 @@ export default function CandidateLoginPage() {
   function onAuthenticated(u) {
     setUser(u);
     setPassword("");
-    // TODO: once the candidate dashboard exists, use navigate("/candidate/dashboard") instead.
+    navigate("/candidate/join");
   }
 
   async function handleSubmit(e) {
@@ -78,17 +78,12 @@ export default function CandidateLoginPage() {
     }
   }
 
-  async function handleLogout() {
-    await api("/auth/logout").catch(() => {});
-    setUser(null);
-    setEmail("");
-    setPassword("");
-  }
-
   function toggleMode() {
     setError(null);
     setMode((m) => (m === "login" ? "signup" : "login"));
   }
+
+  if (!checking && user) return <Navigate to="/candidate/join" replace />;
 
   return (
     <div className="min-h-screen">
@@ -116,23 +111,6 @@ export default function CandidateLoginPage() {
           <div className="mx-auto max-w-sm space-y-5 border-2 border-ink bg-cream-light p-6 shadow-hard">
             {checking ? (
               <p className="text-sm text-ink-light">Loading...</p>
-            ) : user ? (
-              /* Signed-in state */
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h2 className="font-display text-lg uppercase tracking-tight text-ink">
-                    You&rsquo;re signed in
-                  </h2>
-                  <p className="break-all text-sm text-ink-light">{user.email}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="button-brutal inline-flex w-full items-center justify-center border-2 border-ink bg-transparent px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-ink hover:bg-ink hover:text-cream"
-                >
-                  Log out
-                </button>
-              </div>
             ) : (
               /* Login / signup */
               <>
