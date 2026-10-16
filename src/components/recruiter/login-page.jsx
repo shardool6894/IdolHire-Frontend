@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
+import AssessmentsUI from "./assessments"
 
 const ROLE = "recruiter";
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
@@ -44,7 +45,7 @@ export default function RecruiterLoginPage() {
   function onAuthenticated(u) {
     setUser(u);
     setPassword("");
-    // TODO: once the recruiter dashboard exists, use navigate("/recruiter/dashboard") instead.
+    navigate("/recruiter/assessments")
   }
 
   async function handleSubmit(e) {
@@ -90,6 +91,10 @@ export default function RecruiterLoginPage() {
     setMode((m) => (m === "login" ? "signup" : "login"));
   }
 
+  if (!checking && user) {
+    return <AssessmentsUI user={user} onLogout={handleLogout} />;
+  }
+
   return (
     <div className="min-h-screen">
       <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-8">
@@ -116,23 +121,6 @@ export default function RecruiterLoginPage() {
           <div className="mx-auto max-w-sm space-y-5 border-2 border-ink bg-cream-light p-6 shadow-hard">
             {checking ? (
               <p className="text-sm text-ink-light">Loading...</p>
-            ) : user ? (
-              /* Signed-in state */
-              <div className="space-y-4">
-                <div className="space-y-1">
-                  <h2 className="font-display text-lg uppercase tracking-tight text-ink">
-                    You&rsquo;re signed in
-                  </h2>
-                  <p className="break-all text-sm text-ink-light">{user.email}</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={handleLogout}
-                  className="button-brutal inline-flex w-full items-center justify-center border-2 border-ink bg-transparent px-5 py-2.5 text-sm font-bold uppercase tracking-wide text-ink hover:bg-ink hover:text-cream"
-                >
-                  Log out
-                </button>
-              </div>
             ) : (
               /* Login / signup */
               <>

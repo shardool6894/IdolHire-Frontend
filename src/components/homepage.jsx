@@ -49,7 +49,7 @@ export default function Homepage() {
             title="Run an assessment"
             description="Pick a question sequence, set a time limit, and share a link. Review scores as candidates finish."
             cta="Continue as recruiter"
-            onClick={() => navigate("/recruiter")}
+            onClick={() => navigate("/recruiter/auth")}
           />
           <RoleCard
             tone="blue"
@@ -57,7 +57,7 @@ export default function Homepage() {
             title="Take an assessment"
             description="Join with the token your recruiter sent you, then work through the interview against the clock."
             cta="Continue as candidate"
-            onClick={() => navigate("/candidate")}
+            onClick={() => navigate("/candidate/auth")}
           />
         </div>
       </div>
