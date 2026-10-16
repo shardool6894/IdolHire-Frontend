@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
-const API = "http://localhost:5000/api"; // change to your backend URL
+import { api } from "../../api.js";
 
 const inputClass =
   "w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30";
@@ -9,28 +8,20 @@ const inputClass =
 export default function NewAssessment(){
   const navigate = useNavigate()
 
-  const [sequences, setSequences] = useState([{ id: "demo-value", name: "demo value" }]);
-  const [sequenceId, setSequenceId] = useState("demo-value");
+  const [sequences, setSequences] = useState([]);
+  const [sequenceId, setSequenceId] = useState("");
   const [duration, setDuration] = useState(45);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // load question sequences for the dropdown (remove this block while you have no backend)
+  // load question sequences for the dropdown
   useEffect(() => {
-    async function loadSequences() {
-      try {
-        const res = await fetch(`${API}/question-sequences`, { credentials: "include" });
-        if (!res.ok) throw new Error("Failed to load sequences");
-        const data = await res.json();
-        if (data.length) {
-          setSequences(data);
-          setSequenceId(data[0].id);
-        }
-      } catch (err) {
-        setError(err.message);
-      }
-    }
-    loadSequences();
+    api("/question-sequences")
+      .then((data) => {
+        setSequences(data.sequences);
+        if (data.sequences.length) setSequenceId(data.sequences[0].id);
+      })
+      .catch((err) => setError(err.message));
   }, []);
 
   async function createAssessment(e){
@@ -38,16 +29,10 @@ export default function NewAssessment(){
     setLoading(true);
     setError("");
     try {
-      const res = await fetch(`${API}/assessments`, {
+      await api("/assessments", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({
-          questionSequenceId: sequenceId,
-          durationMinutes: Number(duration),
-        }),
+        body: { questionSequenceId: sequenceId, durationMinutes: Number(duration) },
       });
-      if (!res.ok) throw new Error("Could not create assessment");
       navigate("/recruiter/assessments");
     } catch (err) {
       setError(err.message);
@@ -85,7 +70,7 @@ export default function NewAssessment(){
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Question sequence</span>
                 <select
-                  className="w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30"
+                  className={inputClass}
                   required
                   value={sequenceId}
                   onChange={(e) => setSequenceId(e.target.value)}
@@ -98,7 +83,7 @@ export default function NewAssessment(){
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Duration (minutes)</span>
                 <input
-                  className="w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30"
+                  className={inputClass}
                   min="1"
                   required
                   type="number"
@@ -113,7 +98,7 @@ export default function NewAssessment(){
                 <button
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40 button-brutal border-2 border-ink bg-red text-cream hover:bg-ink "
                   type="submit"
-                  disabled={loading}
+                  disabled={loading || !sequenceId}
                 >
                   Create assessment
                 </button>

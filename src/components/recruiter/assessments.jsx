@@ -1,21 +1,21 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import AssessmentResult from "./assessmentResult.jsx";
+import { useEffect, useState } from "react";
+import { useNavigate, useOutletContext, Link } from "react-router-dom";
+import { api } from "../../api.js";
 
-const MOCK_ASSESSMENTS = [
-  {
-    id: "1",
-    duration: "60 min",
-    status: "OPEN",
-    token: "xyz-789",
-    created: "—",
-  },
-];
-
-export default function AssessmentsUI({ user, onLogout }) {
+export default function AssessmentsUI() {
+  const { user, onLogout } = useOutletContext();
   const navigate = useNavigate();
   const [copied, setCopied] = useState(null);
-  const [selectedId, setSelectedId] = useState(null);
+  const [assessments, setAssessments] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api("/assessments")
+      .then((data) => setAssessments(data.assessments))
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, []);
 
   async function copyToken(token) {
     try {
@@ -25,18 +25,6 @@ export default function AssessmentsUI({ user, onLogout }) {
     } catch {
       setCopied(null);
     }
-  }
-
-  if (selectedId) {
-    return (
-      <AssessmentResult
-        assessment={MOCK_ASSESSMENTS.find((a) => a.id === selectedId)}
-        onBack={() => setSelectedId(null)}
-        onHome={() => navigate("/")}
-        user={user}
-        onLogout={onLogout}
-      />
-    );
   }
 
   return (
@@ -82,11 +70,17 @@ export default function AssessmentsUI({ user, onLogout }) {
           </button></Link>
         </div>
 
+        {loading && <p className="text-sm text-ink-light">Loading...</p>}
+        {error && <p className="text-sm font-semibold text-red">{error}</p>}
+        {!loading && !error && assessments.length === 0 && (
+          <p className="text-sm text-ink-light">No assessments yet. Create your first one.</p>
+        )}
+
         <div className="grid gap-6 sm:grid-cols-2">
-          {MOCK_ASSESSMENTS.map((assessment) => (
+          {assessments.map((assessment) => (
             <article key={assessment.id} className="border-[3px] border-ink bg-cream-light p-8 shadow-hard-lg">
               <div className="mb-6 flex items-start justify-between">
-                <span className="font-mono text-sm font-medium">{assessment.duration}</span>
+                <span className="font-mono text-sm font-medium">{assessment.durationMinutes} min</span>
                 <span className="border-2 border-blue px-4 py-1 text-sm font-bold tracking-wide text-blue">
                   {assessment.status}
                 </span>
@@ -99,12 +93,12 @@ export default function AssessmentsUI({ user, onLogout }) {
                     {copied === assessment.token ? "copied" : "copy"}
                   </button>
                 </div>
-                <span className="font-mono text-sm text-ink-light">created {assessment.created}</span>
+                <span className="font-mono text-sm text-ink-light">created {new Date(assessment.createdAt).toLocaleDateString()}</span>
               </div>
 
               <button
                 type="button"
-                onClick={() => setSelectedId(assessment.id)}
+                onClick={() => navigate(`/recruiter/assessments/${assessment.id}`)}
                 className="button-brutal border-[3px] border-ink bg-cream-light px-6 py-3 text-sm font-bold uppercase tracking-wide text-ink hover:bg-ink hover:text-cream"
               >
                 View Results

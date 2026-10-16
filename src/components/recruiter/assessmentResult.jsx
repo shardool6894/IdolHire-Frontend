@@ -1,8 +1,30 @@
-export default function AssessmentResult({ assessment, onBack, onHome, user, onLogout }) {
-  const rows = [
-    { email: "candidate.one@example.com", score: "84", status: "Complete" },
-    { email: "candidate.two@example.com", score: "—", status: "In progress" },
-  ];
+import { useEffect, useState } from "react";
+import { useNavigate, useOutletContext, useParams } from "react-router-dom";
+import { api } from "../../api.js";
+
+const STATUS_LABELS = { complete: "Complete", in_progress: "In progress", expired: "Time expired" };
+
+export default function AssessmentResult() {
+  const { user, onLogout } = useOutletContext();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const [assessment, setAssessment] = useState(null);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    api(`/assessments/${id}/results`)
+      .then((data) => {
+        setAssessment(data.assessment);
+        setRows(data.results);
+      })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  const onBack = () => navigate("/recruiter/assessments");
+  const onHome = () => navigate("/");
 
   return (
     <div className="min-h-screen">
@@ -48,7 +70,7 @@ export default function AssessmentResult({ assessment, onBack, onHome, user, onL
             </button>
             <h1 className="font-display text-3xl uppercase tracking-tight text-ink sm:text-4xl">Results</h1>
             <p className="font-mono text-sm text-ink-light">
-              Token {assessment?.token ?? "—"} · {assessment?.duration ?? "—"}
+              Token {assessment?.token ?? "—"} · {assessment ? `${assessment.durationMinutes} min` : "—"}
             </p>
           </div>
         </div>
@@ -59,14 +81,19 @@ export default function AssessmentResult({ assessment, onBack, onHome, user, onL
             <span>Score</span>
             <span>Status</span>
           </div>
+          {loading && <p className="px-6 py-4 text-sm text-ink-light">Loading...</p>}
+          {error && <p className="px-6 py-4 text-sm font-semibold text-red">{error}</p>}
+          {!loading && !error && rows.length === 0 && (
+            <p className="px-6 py-4 text-sm text-ink-light">No candidates have started this assessment yet.</p>
+          )}
           {rows.map((row) => (
             <div
-              key={row.email}
+              key={row.id}
               className="grid grid-cols-[1fr_auto_auto] items-center gap-4 border-b-2 border-ink/15 px-6 py-4 last:border-b-0"
             >
               <span className="truncate text-sm">{row.email}</span>
-              <span className="font-mono text-sm">{row.score}</span>
-              <span className="text-sm font-bold uppercase tracking-wide text-blue">{row.status}</span>
+              <span className="font-mono text-sm">{row.score == null ? "—" : `${row.score}/${row.maxScore}`}</span>
+              <span className="text-sm font-bold uppercase tracking-wide text-blue">{STATUS_LABELS[row.status] ?? row.status}</span>
             </div>
           ))}
         </div>

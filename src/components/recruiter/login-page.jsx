@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import { GoogleLogin } from "@react-oauth/google";
-import AssessmentsUI from "./assessments"
 
 const ROLE = "recruiter";
 const API = import.meta.env.VITE_API_URL ?? "http://localhost:8000/api";
@@ -79,20 +78,13 @@ export default function RecruiterLoginPage() {
     }
   }
 
-  async function handleLogout() {
-    await api("/auth/logout").catch(() => {});
-    setUser(null);
-    setEmail("");
-    setPassword("");
-  }
-
   function toggleMode() {
     setError(null);
     setMode((m) => (m === "login" ? "signup" : "login"));
   }
 
   if (!checking && user) {
-    return <AssessmentsUI user={user} onLogout={handleLogout} />;
+    return <Navigate to="/recruiter/assessments" replace />;
   }
 
   return (
