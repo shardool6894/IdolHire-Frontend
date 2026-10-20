@@ -4,11 +4,12 @@ import { api } from "../../api.js";
 
 const inputClass =
   "w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30";
-
+const interviewInputClass = inputClass + " interview-input";
 export default function NewAssessment(){
   const navigate = useNavigate()
 
   const [sequences, setSequences] = useState([]);
+  const [interviewType, setInterviewType] = useState("SDE");
   const [sequenceId, setSequenceId] = useState("");
   const [duration, setDuration] = useState(45);
   const [loading, setLoading] = useState(false);
@@ -31,7 +32,7 @@ export default function NewAssessment(){
     try {
       await api("/assessments", {
         method: "POST",
-        body: { questionSequenceId: sequenceId, durationMinutes: Number(duration) },
+        body: { typeOfInterview: interviewType, questionSequenceId: sequenceId, durationMinutes: Number(duration) },
       });
       navigate("/recruiter/assessments");
     } catch (err) {
@@ -68,6 +69,16 @@ export default function NewAssessment(){
             <h2 className="font-display text-lg uppercase tracking-tight text-ink">New assessment</h2>
             <form className="space-y-4" onSubmit={createAssessment}>
               <label className="block space-y-1.5">
+                <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Type Of Interview?</span>
+                <select
+                  className={interviewInputClass}
+                  required
+                  value={interviewType}
+                  onChange={(e) => setInterviewType(e.target.value)}
+                >
+                  <option value="SDE">SDE</option>
+                  <option value="Non-SDE">Non-SDE</option>
+                </select>
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Question sequence</span>
                 <select
                   className={inputClass}

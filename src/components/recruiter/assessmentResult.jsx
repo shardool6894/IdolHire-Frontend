@@ -76,9 +76,10 @@ export default function AssessmentResult() {
         </div>
 
         <div className="overflow-hidden border-[3px] border-ink bg-cream-light shadow-hard-lg">
-          <div className="grid grid-cols-[1fr_auto_auto_5rem] gap-4 border-b-2 border-ink bg-cream-dark px-6 py-3 font-mono text-xs uppercase tracking-widest text-ink-light">
+          <div className="grid grid-cols-[1fr_auto_auto_auto_5rem] gap-4 border-b-2 border-ink bg-cream-dark px-6 py-3 font-mono text-xs uppercase tracking-widest text-ink-light">
             <span>Candidate</span>
             <span>Answered</span>
+            <span>Score</span>
             <span>Status</span>
             <span>Response</span>
           </div>
@@ -116,9 +117,10 @@ function ResultRow({ assessmentId, row }) {
 
   return (
     <div className="border-b-2 border-ink/15 last:border-b-0">
-      <div className="grid grid-cols-[1fr_auto_auto_5rem] items-center gap-4 px-6 py-4">
+      <div className="grid grid-cols-[1fr_auto_auto_auto_5rem] items-center gap-4 px-6 py-4">
         <span className="truncate text-sm">{row.email}</span>
         <span className="font-mono text-sm">{row.answered}/{row.total}</span>
+        <span className="font-mono text-sm">{row.score == null ? "\u2014" : `${row.score}/${row.maxScore}`}</span>
         <span className="text-sm font-bold uppercase tracking-wide text-blue">
           {STATUS_LABELS[row.status] ?? row.status}
         </span>
@@ -136,12 +138,36 @@ function ResultRow({ assessmentId, row }) {
         <div className="space-y-6 border-t-2 border-ink/15 bg-cream px-6 py-5">
           {error && <p className="text-sm font-semibold text-red">{error}</p>}
           {!error && !detail && <p className="text-sm text-ink-light">Loading...</p>}
+          {detail?.attempt.overallFeedback && (
+            <div className="space-y-2 border-2 border-ink/20 bg-cream-light px-4 py-3 text-sm">
+              <p className="font-mono text-xs uppercase tracking-widest text-ink-light">Overall feedback</p>
+              <p className="whitespace-pre-wrap">{detail.attempt.overallFeedback}</p>
+              {detail.attempt.aiSteeringScore != null && (
+                <p className="whitespace-pre-wrap text-ink-light">
+                  <span className="font-mono text-xs uppercase tracking-widest">
+                    Helper use {detail.attempt.aiSteeringScore}/5:
+                  </span>{" "}
+                  {detail.attempt.aiSteeringRationale}
+                </p>
+              )}
+            </div>
+          )}
           {detail?.responses.map((r, i) => (
             <div key={i} className="space-y-3">
               <p className="whitespace-pre-wrap text-sm font-semibold">
-                <span className="mr-2 font-mono text-xs text-ink-light">Stage {i + 1}</span>
+                <span className="mr-2 font-mono text-xs text-ink-light">
+                  Stage {i + 1}
+                  {r.axis ? ` \u00b7 ${r.axis}` : ""}
+                </span>
                 {r.prompt}
               </p>
+
+              {r.trapClaim && (
+                <p className="whitespace-pre-wrap border-l-4 border-blue bg-blue/5 px-3 py-2 text-xs">
+                  <span className="mr-1 font-mono uppercase tracking-widest text-ink-light">AI copilot claim:</span>
+                  {r.trapClaim}
+                </p>
+              )}
 
               {r.guidance && (
                 <p className="whitespace-pre-wrap border-2 border-dashed border-ink/30 px-3 py-2 text-xs text-ink-light">
@@ -154,6 +180,15 @@ function ResultRow({ assessmentId, row }) {
                 <p className="font-mono text-xs text-ink-light">Not answered</p>
               ) : (
                 <p className="whitespace-pre-wrap border-2 border-blue/50 bg-blue/5 px-3 py-2 text-sm">{r.answer}</p>
+              )}
+
+              {r.answer !== null && (
+                <p className="whitespace-pre-wrap text-sm">
+                  <span className="mr-2 font-mono text-xs uppercase tracking-widest text-ink-light">
+                    AI score {r.score == null ? "not graded" : `${r.score}/5`}
+                  </span>
+                  {r.rationale}
+                </p>
               )}
 
               {r.helper.length > 0 && (

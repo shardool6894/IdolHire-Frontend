@@ -1,5 +1,7 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useParams } from "react-router-dom";
+//import sandbox here
+import CodeEditor from "../sandbox.jsx";
 import { api } from "../../api.js";
 
 function formatTime(ms) {
@@ -34,8 +36,8 @@ export default function AssessmentTest() {
     );
   }
   if (!session) return <p className="mt-8 text-sm text-ink-light">Loading...</p>;
-
-  return <Test session={session} />;
+  const isSDE = session.attempt.typeOfInterview === "SDE";
+  return isSDE ? <SdeSandboxTest session={session} /> : <Test session={session} />;
 }
 
 const MAX_ANSWER_CHARS = 4000;
@@ -56,6 +58,7 @@ function Test({ session }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState(false);
+  const [results, setResults] = useState(null); // scores and feedback, once the test is submitted
 
   const finalizing = !done && current >= total;
   const answering = !done && !finalizing;
@@ -74,7 +77,8 @@ function Test({ session }) {
     setBusy(true);
     setError("");
     try {
-      await api(`/attempts/${attempt.id}/submit`, { method: "POST" });
+      const data = await api(`/attempts/${attempt.id}/submit`, { method: "POST" });
+      setResults(data.results);
       setDone(true);
     } catch (err) {
       if (err.status === 409) {
@@ -207,16 +211,43 @@ function Test({ session }) {
       </div>
 
       {done && (
-        <div className="space-y-3 border-[3px] border-ink bg-cream-light p-8 shadow-hard-lg">
-          <h2 className="font-display text-xl uppercase tracking-tight text-ink">Test submitted</h2>
-          <p className="text-base">Your responses have been sent to the recruiter.</p>
-          <p className="text-sm text-ink-light">You can close this page now.</p>
+        <div className="space-y-6 border-[3px] border-ink bg-cream-light p-8 shadow-hard-lg">
+          <div className="space-y-2">
+            <h2 className="font-display text-xl uppercase tracking-tight text-ink">Test submitted</h2>
+            <p className="text-base">Your responses have been sent to the recruiter.</p>
+          </div>
+
+          {results?.overallFeedback && (
+            <div className="space-y-2">
+              <h3 className="text-sm font-bold uppercase tracking-wide text-ink">Overall feedback</h3>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">{results.overallFeedback}</p>
+            </div>
+          )}
+
+          {results?.stages.length > 0 ? (
+            <ul className="space-y-3">
+              {results.stages.map((r) => (
+                <li key={r.stage} className="border-2 border-ink/20 px-4 py-3 text-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <span className="font-mono text-xs uppercase tracking-widest text-ink-light">
+                      Stage {r.stage + 1}
+                    </span>
+                    <span className="font-mono font-bold">{r.score}/5</span>
+                  </div>
+                  <p className="mt-1 whitespace-pre-wrap">{r.rationale}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-ink-light">Scores aren&rsquo;t available yet.</p>
+          )}
         </div>
       )}
 
       {finalizing && (
         <div className="space-y-5 border-[3px] border-ink bg-cream-light p-8 shadow-hard-lg">
           <p className="text-base">All stages answered. Finalizing...</p>
+          {busy && <p className="text-sm text-ink-light">Grading your answers. This can take a minute.</p>}
           {errorLine}
           <button
             type="button"
@@ -224,7 +255,7 @@ function Test({ session }) {
             disabled={busy}
             className="button-brutal border-[3px] border-ink bg-red px-6 py-3 text-sm font-bold uppercase tracking-wide text-cream hover:bg-ink disabled:cursor-not-allowed disabled:opacity-40"
           >
-            {busy ? "Submitting..." : "Get final results"}
+            {busy ? "Grading..." : "Get final results"}
           </button>
         </div>
       )}
@@ -237,6 +268,12 @@ function Test({ session }) {
               Stage {current + 1} of {total}
             </span>
             <p className="whitespace-pre-wrap text-lg leading-relaxed text-ink">{questions[current].prompt}</p>
+            {questions[current].trapClaim && (
+              <blockquote className="space-y-1 border-l-4 border-blue bg-blue/5 px-4 py-3">
+                <span className="block font-mono text-xs uppercase tracking-widest text-ink-light">AI copilot says</span>
+                <p className="whitespace-pre-wrap text-sm">{questions[current].trapClaim}</p>
+              </blockquote>
+            )}
           </div>
 
           {/* Helper */}
@@ -319,6 +356,7 @@ function Test({ session }) {
               <p className="text-right font-mono text-xs text-ink-light">
                 {draft.length}/{MAX_ANSWER_CHARS}
               </p>
+              {busy && <p className="text-sm text-ink-light">Saving and grading your answer...</p>}
               {errorLine}
               <button
                 type="button"
@@ -332,6 +370,80 @@ function Test({ session }) {
           )}
         </>
       )}
+    </div>
+  );
+}
+
+function SdeSandboxTest({ session }) {
+  const [draft, setDraft] = useState("");
+  const [output, setOutput] = useState("");
+  const [running, setRunning] = useState(false);
+  const [language, setLanguage] = useState("javascript");
+
+  // New function to run code via your backend proxy
+  async function runCode() {
+    if (!draft.trim()) return;
+    setRunning(true);
+    setOutput("Running...");
+    
+    try {
+      const res = await api("/sandbox/execute", {
+        method: "POST",
+        body: { language, code: draft }
+      });
+      setOutput(res.output || "Execution finished with no output.");
+    } catch (err) {
+      setOutput(`Error: ${err.message}`);
+    } finally {
+      setRunning(false);
+    }
+  }
+
+  return (
+    <div className="flex h-screen w-full flex-col bg-cream">
+      <div className="flex flex-1 overflow-hidden">
+        {/* Left Col: Prompt & Helper */}
+        <div className="w-1/3 overflow-y-auto border-r-2 border-ink p-4">
+          <h2 className="font-bold uppercase tracking-wide">Stage {session.answers.length + 1}</h2>
+          <p className="mt-4 whitespace-pre-wrap">{session.questions[session.answers.length].prompt}</p>
+        </div>
+
+        {/* Right Col: Code Editor & Terminal */}
+        <div className="flex w-2/3 flex-col border-l-2 border-ink bg-ink text-cream">
+          {/* Header Controls */}
+          <div className="flex items-center justify-between border-b-2 border-ink-light bg-ink p-2">
+            <select 
+              value={language} 
+              onChange={(e) => setLanguage(e.target.value)}
+              className="bg-cream text-ink px-2 py-1 text-sm font-mono"
+            >
+              <option value="javascript">JavaScript (Node)</option>
+              <option value="python">Python 3</option>
+              <option value="java">Java</option>
+            </select>
+            <button 
+              onClick={runCode} 
+              disabled={running}
+              className="bg-blue px-4 py-1 text-sm font-bold uppercase text-cream hover:bg-blue/80"
+            >
+              {running ? "Executing..." : "Run Code"}
+            </button>
+          </div>
+
+          {/* Code Editor */}
+          <div className="flex-1 overflow-hidden">
+            <CodeEditor value={draft} onChange={setDraft} language={language} />
+          </div>
+
+          {/* Output Terminal */}
+          <div className="h-1/3 border-t-2 border-ink-light bg-black p-4 font-mono text-sm">
+            <span className="text-ink-light block mb-2 uppercase text-xs tracking-widest">Output</span>
+            <pre className={`whitespace-pre-wrap ${output.includes("Error:") ? "text-red" : "text-cream"}`}>
+              {output || "Code output will appear here..."}
+            </pre>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
