@@ -5,6 +5,7 @@ import { api } from "../../api.js";
 const inputClass =
   "w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30";
 const interviewInputClass = inputClass + " interview-input";
+
 export default function NewAssessment(){
   const navigate = useNavigate()
 
@@ -15,15 +16,19 @@ export default function NewAssessment(){
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // load question sequences for the dropdown
+  // Re-fetch question sequences whenever interviewType changes
   useEffect(() => {
-    api("/question-sequences")
+    api(`/question-sequences?typeOfInterview=${interviewType}`)
       .then((data) => {
         setSequences(data.sequences);
-        if (data.sequences.length) setSequenceId(data.sequences[0].id);
+        if (data.sequences.length) {
+          setSequenceId(data.sequences[0].id);
+        } else {
+          setSequenceId(""); // Clear selection if no sequences exist for this type
+        }
       })
       .catch((err) => setError(err.message));
-  }, []);
+  }, [interviewType]);
 
   async function createAssessment(e){
     e.preventDefault();
@@ -79,18 +84,25 @@ export default function NewAssessment(){
                   <option value="SDE">SDE</option>
                   <option value="Non-SDE">Non-SDE</option>
                 </select>
+                
+                {/* Wrapped second label properly instead of nesting it */}
+              </label>
+              <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Question sequence</span>
                 <select
                   className={inputClass}
                   required
                   value={sequenceId}
                   onChange={(e) => setSequenceId(e.target.value)}
+                  disabled={sequences.length === 0}
                 >
+                  {sequences.length === 0 && <option value="">No sequences available</option>}
                   {sequences.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
                 </select>
               </label>
+              
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Duration (minutes)</span>
                 <input
