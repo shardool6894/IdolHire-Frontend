@@ -14,20 +14,42 @@ export default function NewAssessment(){
   const [sequenceId, setSequenceId] = useState("");
   const [duration, setDuration] = useState(45);
   const [loading, setLoading] = useState(false);
+  const [loadingSequences, setLoadingSequences] = useState(true);
   const [error, setError] = useState("");
 
-  // Re-fetch question sequences whenever interviewType changes
+  // Switching the interview type must immediately drop the previous type's list and selection.
+  // Otherwise the old sequenceId stays selected (and submittable) until the new list arrives,
+  // which could pair e.g. an SDE interview with a Non-SDE sequence.
+  function changeInterviewType(next) {
+    setInterviewType(next);
+    setSequences([]);
+    setSequenceId("");
+    setError("");
+    setLoadingSequences(true);
+  }
+
+  // Fetch the question sequences for the selected interview type.
   useEffect(() => {
-    api(`/question-sequences?typeOfInterview=${interviewType}`)
+    // If the type changes again before this response lands, ignore the stale response so it
+    // can't overwrite the list for the type that is actually selected.
+    let ignore = false;
+
+    api(`/question-sequences?typeOfInterview=${encodeURIComponent(interviewType)}`)
       .then((data) => {
+        if (ignore) return;
         setSequences(data.sequences);
-        if (data.sequences.length) {
-          setSequenceId(data.sequences[0].id);
-        } else {
-          setSequenceId(""); // Clear selection if no sequences exist for this type
-        }
+        setSequenceId(data.sequences[0]?.id ?? ""); // blank if none exist for this type
       })
-      .catch((err) => setError(err.message));
+      .catch((err) => {
+        if (!ignore) setError(err.message);
+      })
+      .finally(() => {
+        if (!ignore) setLoadingSequences(false);
+      });
+
+    return () => {
+      ignore = true;
+    };
   }, [interviewType]);
 
   async function createAssessment(e){
@@ -79,7 +101,7 @@ export default function NewAssessment(){
                   className={interviewInputClass}
                   required
                   value={interviewType}
-                  onChange={(e) => setInterviewType(e.target.value)}
+                  onChange={(e) => changeInterviewType(e.target.value)}
                 >
                   <option value="SDE">SDE</option>
                   <option value="Non-SDE">Non-SDE</option>
@@ -94,9 +116,11 @@ export default function NewAssessment(){
                   required
                   value={sequenceId}
                   onChange={(e) => setSequenceId(e.target.value)}
-                  disabled={sequences.length === 0}
+                  disabled={loadingSequences || sequences.length === 0}
                 >
-                  {sequences.length === 0 && <option value="">No sequences available</option>}
+                  {sequences.length === 0 && (
+                    <option value="">{loadingSequences ? "Loading…" : "No sequences available"}</option>
+                  )}
                   {sequences.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -121,7 +145,7 @@ export default function NewAssessment(){
                 <button
                   className="inline-flex items-center justify-center gap-2 px-5 py-2.5 text-sm font-bold uppercase tracking-wide disabled:cursor-not-allowed disabled:opacity-40 button-brutal border-2 border-ink bg-red text-cream hover:bg-ink "
                   type="submit"
-                  disabled={loading || !sequenceId}
+                  disabled={loading || loadingSequences || !sequenceId}
                 >
                   Create assessment
                 </button>
