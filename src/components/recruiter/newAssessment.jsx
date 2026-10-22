@@ -6,13 +6,17 @@ const inputClass =
   "w-full border-2 border-ink bg-cream-light px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-light/50 focus:border-blue focus:ring-2 focus:ring-blue/30";
 const interviewInputClass = inputClass + " interview-input";
 
+// Suggested length per interview type: the DSA sequence has 5 coding stages, welding has 5 written ones.
+const DEFAULT_MINUTES = { SDE: 60, "Non-SDE": 45 };
+
 export default function NewAssessment(){
   const navigate = useNavigate()
 
   const [sequences, setSequences] = useState([]);
   const [interviewType, setInterviewType] = useState("SDE");
   const [sequenceId, setSequenceId] = useState("");
-  const [duration, setDuration] = useState(45);
+  const [duration, setDuration] = useState(DEFAULT_MINUTES.SDE); // matches the initial type
+  const [durationEdited, setDurationEdited] = useState(false); // once the recruiter types a value, stop overriding it
   const [loading, setLoading] = useState(false);
   const [loadingSequences, setLoadingSequences] = useState(true);
   const [error, setError] = useState("");
@@ -26,6 +30,7 @@ export default function NewAssessment(){
     setSequenceId("");
     setError("");
     setLoadingSequences(true);
+    if (!durationEdited) setDuration(DEFAULT_MINUTES[next]);
   }
 
   // Fetch the question sequences for the selected interview type.
@@ -106,8 +111,6 @@ export default function NewAssessment(){
                   <option value="SDE">SDE</option>
                   <option value="Non-SDE">Non-SDE</option>
                 </select>
-                
-                {/* Wrapped second label properly instead of nesting it */}
               </label>
               <label className="block space-y-1.5">
                 <span className="text-xs font-semibold uppercase tracking-wide text-ink-light">Question sequence</span>
@@ -135,7 +138,10 @@ export default function NewAssessment(){
                   required
                   type="number"
                   value={duration}
-                  onChange={(e) => setDuration(e.target.value)}
+                  onChange={(e) => {
+                    setDuration(e.target.value);
+                    setDurationEdited(true);
+                  }}
                 />
               </label>
 
