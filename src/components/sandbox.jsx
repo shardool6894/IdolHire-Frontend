@@ -1,85 +1,113 @@
-// backend/routes/sandbox.js
-const express = require("express");
-const rateLimit = require("express-rate-limit");
-const { requireAuth, requireRole } = require("../middleware/auth");
+import { useCallback, useEffect, useRef, useState } from "react";
+import CodeMirror, { keymap } from "@uiw/react-codemirror";
+import { indentWithTab } from "@codemirror/commands";
+import { javascript } from "@codemirror/lang-javascript";
+import { python } from "@codemirror/lang-python";
+import { java } from "@codemirror/lang-java";
+import { cpp } from "@codemirror/lang-cpp";
 
-const router = express.Router();
-
-// Using Piston API for this example (no API key required for basic testing)
-// For production, you can point this to your own hosted Piston or Judge0 instance.
-// Allowlist: the client sends our key, never a free-form Piston language name.
-const LANGUAGES = {
-  javascript: "javascript",
-  python: "python",
-  java: "java",
-  cpp: "c++",
+// Module-level so the extension arrays keep the same identity between renders.
+const TAB = keymap.of([indentWithTab]);
+const EXTENSIONS = {
+  javascript: [javascript(), TAB],
+  python: [python(), TAB],
+  java: [java(), TAB],
+  cpp: [cpp(), TAB],
 };
-const MAX_CODE_CHARS = 4000;
-const MAX_OUTPUT_CHARS = 10_000;
-const REQUEST_TIMEOUT_MS = 20_000;
 
-const runLimiter = rateLimit({
-  windowMs: 60 * 1000,
-  limit: 20,
-  standardHeaders: true,
-  legacyHeaders: false,
-  keyGenerator: (req) => String(req.user._id),
-  message: { error: "You're running code too quickly. Wait a moment." },
-});
 
-router.use(requireAuth, requireRole("candidate"));
+/**
+ * Minimal code editor built on a plain <textarea>.
+ * Accepts `value`, `onChange(newValue)`, and `language` (display-only label).
+ * Features: line numbers, tab-key support (inserts 2 spaces), dark theme.
+ */
+export default function CodeEditor({ value = "", onChange, language }) {
+  const textareaRef = useRef(null);
+  const lineNumbersRef = useRef(null);
+  const lineCount = Math.max(1, (value.match(/\n/g) || []).length + 1);
 
-router.post("/execute", runLimiter, async (req, res, next) => {
-  try {
-    const { language, code } = req.body;
-    const pistonLanguage = typeof language === "string" ? LANGUAGES[language] : undefined;
+  // Keep line count in sync with the value.
+  useEffect(() => {
+    setLineCount(Math.max(1, (value.match(/\n/g) || []).length + 1));
+  }, [value]);
 
-    if (!pistonLanguage) return res.status(400).json({ error: "Unsupported language." });
-    if (typeof code !== "string" || !code.trim()) return res.status(400).json({ error: "Write some code first." });
-    if (code.length > MAX_CODE_CHARS) {
-      return res.status(400).json({ error: `Code can be at most ${MAX_CODE_CHARS} characters.` });
+  // Sync line-number scroll position with the textarea.
+  const handleScroll = useCallback(() => {
+    if (lineNumbersRef.current && textareaRef.current) {
+      lineNumbersRef.current.scrollTop = textareaRef.current.scrollTop;
     }
+  }, []);
 
-    const base = (process.env.PISTON_URL || "https://emkc.org/api/v2/piston").replace(/\/$/, "");
-    const headers = { "Content-Type": "application/json" };
-    if (process.env.PISTON_API_KEY) headers.Authorization = process.env.PISTON_API_KEY;
-
-    let response;
-    try {
-      response = await fetch(`${base}/execute`, {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          language: pistonLanguage,
-          version: "*",
-          files: [{ content: code }],
-          compile_timeout: 10_000,
-          run_timeout: 5_000,
-        }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  function handleKeyDown(e) {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const ta = textareaRef.current;
+      const start = ta.selectionStart;
+      const end = ta.selectionEnd;
+      const newVal = value.substring(0, start) + "  " + value.substring(end);
+      onChange(newVal);
+      // Restore cursor after React re-renders.
+      requestAnimationFrame(() => {
+        ta.selectionStart = ta.selectionEnd = start + 2;
       });
-    } catch (err) {
-      console.error(`Piston unreachable: ${err.name}`);
-      return res.status(502).json({ error: "The code runner isn't available right now." });
     }
-
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || !data.run) {
-      console.error(`Piston -> ${response.status}: ${JSON.stringify(data).slice(0, 300)}`);
-      return res.status(502).json({ error: "The code runner isn't available right now." });
-    }
-
-    // A failed compile step (Java, C++) has its own output and means the program never ran.
-    const compileFailed = data.compile && data.compile.code !== 0;
-    const output = (compileFailed ? data.compile.output : data.run.output) || "";
-    res.json({
-      output: output.slice(0, MAX_OUTPUT_CHARS),
-      exitCode: compileFailed ? data.compile.code : data.run.code,
-      error: compileFailed || data.run.code !== 0,
-    });
-  } catch (err) {
-    next(err);
   }
-});
 
-module.exports = router;
+  return (
+    <div className="flex h-full w-full overflow-hidden" style={{ background: "#1a1814" }}>
+      {/* Line numbers */}
+      <div
+        ref={lineNumbersRef}
+        className="shrink-0 overflow-hidden select-none"
+        style={{
+          width: "3rem",
+          padding: "0.75rem 0",
+          fontFamily: "var(--font-mono)",
+          fontSize: "13px",
+          lineHeight: "1.5",
+          color: "rgba(255,255,255,0.25)",
+          textAlign: "right",
+          background: "#161410",
+          borderRight: "1px solid rgba(255,255,255,0.08)",
+          whiteSpace: "pre",
+        }}
+        aria-hidden
+      >
+        {Array.from({ length: lineCount }, (_, i) => (
+          <div key={i} style={{ paddingRight: "0.5rem" }}>
+            {i + 1}
+          </div>
+        ))}
+      </div>
+
+      {/* Textarea editor */}
+      <textarea
+        ref={textareaRef}
+        className="min-w-0 flex-1 resize-none outline-none"
+        style={{
+          background: "transparent",
+          color: "#f3eee2",
+          fontFamily: "var(--font-mono)",
+          fontSize: "13px",
+          lineHeight: "1.5",
+          padding: "0.75rem",
+          tabSize: 2,
+          caretColor: "#f5b700",
+          whiteSpace: "pre",
+          overflowWrap: "normal",
+          overflowX: "auto",
+        }}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        onScroll={handleScroll}
+        onKeyDown={handleKeyDown}
+        spellCheck={false}
+        autoComplete="off"
+        autoCorrect="off"
+        autoCapitalize="off"
+        data-language={language}
+        placeholder={`// Start typing your ${language || "code"} here...`}
+      />
+    </div>
+  );
+}
