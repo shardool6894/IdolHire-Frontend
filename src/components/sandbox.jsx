@@ -26,11 +26,6 @@ export default function CodeEditor({ value = "", onChange, language }) {
   const lineNumbersRef = useRef(null);
   const lineCount = Math.max(1, (value.match(/\n/g) || []).length + 1);
 
-  // Keep line count in sync with the value.
-  useEffect(() => {
-    setLineCount(Math.max(1, (value.match(/\n/g) || []).length + 1));
-  }, [value]);
-
   // Sync line-number scroll position with the textarea.
   const handleScroll = useCallback(() => {
     if (lineNumbersRef.current && textareaRef.current) {
